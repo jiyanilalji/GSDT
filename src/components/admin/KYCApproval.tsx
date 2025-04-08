@@ -36,9 +36,26 @@ export default function KYCApproval() {
       setError(null);
       await approveKYCRequest(request.id);
       await loadRequests();
-    } catch (err: any) {
-      console.error('Error approving KYC request:', err);
-      setError(err.message || 'Error approving KYC request');
+    } catch (error: any) {
+      console.error('Error approving KYC request 111:', error);
+      //setError(err.message || 'Error approving KYC request');
+      
+      // Handle specific error messages
+      if (error.message?.includes('missing role')) {
+        setError('You do not have permission to mint tokens. Only users with SUPER_ADMIN can approving.');
+      } else if (error.message?.includes('execution reverted')) {
+        const revertReason = error.data?.message || error.message;
+        if (revertReason.includes('KYC')) {
+          setError('KYC verification required before KYC approving.');
+        } else {
+          setError(revertReason || 'Transaction failed. Please try again.');
+        }
+      } else if (error.code === 'ACTION_REJECTED') {
+        setError('Transaction was rejected by user.');
+      } else {
+        setError('Error approving KYC request.');
+      }
+
     } finally {
       setActionLoading(false);
     }
@@ -54,8 +71,26 @@ export default function KYCApproval() {
       setSelectedRequest(null);
       setRejectReason('');
       await loadRequests();
-    } catch (err: any) {
-      console.error('Error rejecting KYC request:', err);
+    } catch (error: any) {
+      console.error('Error rejecting KYC request:', error);
+      //setError(err.message || 'Error approving KYC request');
+      
+      // Handle specific error messages
+      if (error.message?.includes('missing role')) {
+        setError('You do not have permission to mint tokens. Only users with SUPER_ADMIN can rejecting.');
+      } else if (error.message?.includes('execution reverted')) {
+        const revertReason = error.data?.message || error.message;
+        if (revertReason.includes('KYC')) {
+          setError('KYC verification required before KYC rejecting.');
+        } else {
+          setError(revertReason || 'Transaction failed. Please try again.');
+        }
+      } else if (error.code === 'ACTION_REJECTED') {
+        setError('Transaction was rejected by user.');
+      } else {
+        setError('Error rejecting KYC request.');
+      }
+      
       setError(err.message || 'Error rejecting KYC request');
     } finally {
       setActionLoading(false);

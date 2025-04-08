@@ -5,20 +5,25 @@ import { supabase } from '../lib/supabase';
 // Admin role types
 export enum AdminRole {
   SUPER_ADMIN = 'SUPER_ADMIN',
-  MINTER = 'MINTER_ROLE',
-  BURNER = 'BURNER_ROLE',
-  PAUSER = 'PAUSER_ROLE',
-  PRICE_UPDATER = 'PRICE_UPDATER_ROLE',
   ADMIN = 'ADMIN',
-  MODERATOR = 'MODERATOR'
+  MODERATOR = 'MODERATOR',
+  MINTER = 'MINTER',
+  BURNER = 'BURNER',
+  PAUSER = 'PAUSER',
+  PRICE_UPDATER = 'PRICE_UPDATER'
 }
 
 // Transaction types for monitoring
 export enum TransactionType {
-  MINT = 'MINT',
-  REDEEM = 'REDEEM',
-  TRANSFER = 'TRANSFER',
-  FIAT_DEPOSIT = 'FIAT_DEPOSIT'
+  MINT = 'Mint',
+  BURN = 'Burn',
+  PROCESS_REDEEM = 'Process Redeem',
+  REQUEST_REDEEM = 'Request Redeem',    
+  UPDATE_KYC = 'Update KYC',
+  GRANT_ROLE = 'Grant Role',
+  REVOKE_ROLE = 'Revoke Role',
+  FIAT_DEPOSIT = 'Fiat Depost',
+  TRANSFER = 'Transfer'
 }
 
 // Transaction status
@@ -187,24 +192,18 @@ export const getAdminUsers = async (): Promise<AdminUser[]> => {
       .select('*')
       .order('created_at', { ascending: false });
     
-    if (error) {
-      console.error('Error fetching admin users:', error);
-      return [];
-    }
-    
+    if (error) throw error;
     return data as AdminUser[];
   } catch (error) {
     console.error('Error fetching admin users:', error);
-    return [];
+    throw error;
   }
 };
 
 export const assignUserRole = async (
   address: string, 
   role: AdminRole, 
-  assignedBy: string,
-  name?: string,
-  email?: string
+  assignedBy: string
 ): Promise<boolean> => {
   try {
     // Check if the assigner is a super admin
@@ -230,20 +229,12 @@ export const assignUserRole = async (
       await tx.wait();
     }
     
-    // Normalize the address to lowercase
-    const normalizedAddress = address.toLowerCase();
-    
     // Check if user already has a role
-    const { data: existingRole, error: checkError } = await supabase
+    const { data: existingRole } = await supabase
       .from('admin_roles')
       .select('id')
-      .eq('user_address', normalizedAddress)
-      .maybeSingle();
-    
-    if (checkError) {
-      console.error('Error checking existing role:', checkError);
-      throw new Error('Error checking existing role');
-    }
+      .eq('user_address', address.toLowerCase())
+      .single();
     
     if (existingRole) {
       // Update existing role
@@ -251,36 +242,26 @@ export const assignUserRole = async (
         .from('admin_roles')
         .update({ 
           role,
-          updated_at: new Date().toISOString(),
-          name: name || `User ${normalizedAddress.slice(0, 6)}`,
-          email: email || `${normalizedAddress.slice(0, 6)}@example.com`
+          updated_at: new Date().toISOString()
         })
-        .eq('user_address', normalizedAddress);
+        .eq('user_address', address.toLowerCase());
       
-      if (updateError) {
-        console.error('Error updating role:', updateError);
-        throw new Error('Error updating role');
-      }
+      if (updateError) throw updateError;
     } else {
       // Insert new role
       const { error: insertError } = await supabase
         .from('admin_roles')
         .insert([{
-          user_address: normalizedAddress,
+          user_address: address.toLowerCase(),
           role,
-          created_at: new Date().toISOString(),
-          name: name || `User ${normalizedAddress.slice(0, 6)}`,
-          email: email || `${normalizedAddress.slice(0, 6)}@example.com`
+          created_at: new Date().toISOString()
         }]);
       
-      if (insertError) {
-        console.error('Error inserting role:', insertError);
-        throw new Error('Error inserting role');
-      }
+      if (insertError) throw insertError;
     }
     
     return true;
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error assigning user role:', error);
     throw error;
   }
@@ -295,17 +276,17 @@ export const removeUserRole = async (address: string, removedBy: string): Promis
     }
 
     // Get the user's current role before removing it
-    const { data: userData, error: userError } = await supabase
+    const { data: userData } = await supabase
       .from('admin_roles')
       .select('role')
       .eq('user_address', address.toLowerCase())
       .single();
 
-    if (userError) {
-      throw new Error('Error fetching user role');
+    if (!userData) {
+      throw new Error('User role not found');
     }
 
-    const currentRole = userData?.role as AdminRole;
+    const currentRole = userData.role as AdminRole;
 
     // If it's a contract role, revoke it from the smart contract first
     if (isContractRole(currentRole)) {
@@ -330,53 +311,40 @@ export const removeUserRole = async (address: string, removedBy: string): Promis
       .delete()
       .eq('user_address', address.toLowerCase());
     
-    if (error) {
-      console.error('Error deleting role:', error);
-      throw new Error('Error deleting role');
-    }
-    
+    if (error) throw error;
     return true;
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error removing user role:', error);
     throw error;
   }
 };
 
-// Get user role function
 export const getUserRole = async (address: string): Promise<AdminRole | null> => {
-  if (!address) return null;
-  
   try {
-    // Normalize the address to lowercase
-    const normalizedAddress = address.toLowerCase();
-    
-    // Query the admin_roles table from Supabase
     const { data, error } = await supabase
       .from('admin_roles')
       .select('role')
-      .eq('user_address', normalizedAddress)
-      .maybeSingle();
+      .eq('user_address', address.toLowerCase())
+      .single();
     
     if (error) {
-      console.error('Error fetching user role from Supabase:', error);
-      return null;
-    }
-    
-    if (!data) {
-      return null;
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      throw error;
     }
     
     return data.role as AdminRole;
   } catch (error) {
-    console.error('Error checking user role:', error);
-    return null;
+    console.error('Error getting user role:', error);
+    throw error;
   }
 };
 
 export const hasPermission = (userRole: AdminRole | null, requiredRole: AdminRole): boolean => {
   if (!userRole) return false;
   
-  // Role hierarchy: SUPER_ADMIN > other roles
+  // Role hierarchy: SUPER_ADMIN > ADMIN > MODERATOR > other roles
   switch (requiredRole) {
     case AdminRole.SUPER_ADMIN:
       return userRole === AdminRole.SUPER_ADMIN;

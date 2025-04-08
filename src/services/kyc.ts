@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
-import { getContract } from '../lib/web3';
+import { getContract, getNFTContract } from '../lib/web3';
+import { ethers } from "ethers";
 
 export enum KYCStatus {
   NOT_SUBMITTED = 'NOT_SUBMITTED',
@@ -74,17 +75,33 @@ export const getUserKYCStatus = async (userAddress: string): Promise<{ status: K
   try {
     // First check contract KYC status
     const contract = getContract();
+    const contract_NFT = getNFTContract();
+    if (contract_NFT) {
+      
+      const userBalance = await contract_NFT.balanceOf(userAddress);
+      const readableBalance = ethers.utils.formatUnits(userBalance, 18);
+      
+      if(readableBalance > 0){
+        return { status: KYCStatus.APPROVED };
+      }
+    }
+
+    return { status: KYCStatus.NOT_SUBMITTED };
+
     if (!contract) {
       throw new Error('Contract not initialized');
     }
 
+    /*
     const isKYCApproved = await contract.kycApproved(userAddress);
     
     // If approved on contract, return approved status
     if (isKYCApproved) {
       return { status: KYCStatus.APPROVED };
     }
+    */
 
+    /*
     // Check database status
     const { data, error } = await supabase
       .from('kyc_requests')
@@ -101,35 +118,14 @@ export const getUserKYCStatus = async (userAddress: string): Promise<{ status: K
       return { status: KYCStatus.NOT_SUBMITTED };
     }
 
-    // For testing purposes, auto-approve KYC for specific addresses
-    const testAddresses = [
-      '0x1234567890123456789012345678901234567890',
-      '0x2345678901234567890123456789012345678901',
-      '0x3456789012345678901234567890123456789012'
-    ];
-
-    if (testAddresses.includes(userAddress.toLowerCase())) {
-      return { status: KYCStatus.APPROVED };
-    }
-
     return {
       status: data.status as KYCStatus,
       request: data as KYCRequest
     };
+    */
+
   } catch (error) {
     console.error('Error fetching user KYC status:', error);
-    
-    // For testing purposes, auto-approve KYC for specific addresses
-    const testAddresses = [
-      '0x1234567890123456789012345678901234567890',
-      '0x2345678901234567890123456789012345678901',
-      '0x3456789012345678901234567890123456789012'
-    ];
-
-    if (testAddresses.includes(userAddress.toLowerCase())) {
-      return { status: KYCStatus.APPROVED };
-    }
-
     return { status: KYCStatus.NOT_SUBMITTED };
   }
 };

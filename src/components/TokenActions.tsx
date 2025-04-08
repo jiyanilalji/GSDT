@@ -197,6 +197,7 @@ export default function TokenActions() {
     );
   }
 
+  {/*
   return (
     <div className="mt-8 bg-white p-6 rounded-lg shadow-md">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Token Actions</h3>
@@ -285,4 +286,5 @@ export default function TokenActions() {
       </div>
     </div>
   );
+  */}
 }

@@ -5,6 +5,8 @@ import { useAccount } from 'wagmi';
 import { useGSDTContract } from '../hooks/useContract';
 import { formatEther } from 'ethers/lib/utils';
 
+import { kycCheckNFT } from '../services/kycCheckNFT';
+
 export default function TokenInfo() {
   const { address, isConnected } = useAccount();
   const contract = useGSDTContract();

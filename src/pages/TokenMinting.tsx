@@ -27,7 +27,7 @@ export default function TokenMinting() {
               transition={{ delay: 0.1 }}
               className="mt-2 text-sm text-gray-600"
             >
-              Mint and redeem GSDT tokens
+              Mint GSDT tokens
             </motion.p>
           </div>
           {!isConnected && (

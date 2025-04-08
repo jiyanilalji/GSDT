@@ -4,6 +4,7 @@ import { useAccount } from '../utils/web3';
 import { getReadOnlyContract, getContract } from '../lib/web3';
 import { ethers } from 'ethers';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import { getUserKYCStatus } from '../services/kyc';
 
 export default function TokenInfo() {
   const { address, isConnected, connect } = useAccount();
@@ -23,6 +24,8 @@ export default function TokenInfo() {
         const contract = getContract();
         
         try {
+
+          /*
           const [balanceData, priceData, kycStatus] = await Promise.all([
             contract.balanceOf(address),
             readOnlyContract.currentPrice(),
@@ -33,6 +36,17 @@ export default function TokenInfo() {
           setPrice(ethers.utils.formatEther(priceData));
           setIsKYCApproved(kycStatus);
           setError(null);
+          */
+          
+          console.log(address);
+          const kycResponse = await getUserKYCStatus(address);
+          console.log(kycResponse);
+          if(kycResponse?.status == "APPROVED"){
+            setIsKYCApproved(true);
+          } else {
+            setIsKYCApproved(false);
+          }
+  
         } catch (err) {
           console.error('Error fetching token data:', err);
           // Use default values

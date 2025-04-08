@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import { GSDT_ADDRESS, GSDT_ABI } from '../contracts/GSDT';
+import { GSDT_NFT_ADDRESS, GSDT_NFT_ABI } from '../contracts/GSDT_NFT';
 import { supabase } from './supabase';
 
 declare global {
@@ -14,6 +15,20 @@ const RPC_CONFIG = {
     url: "https://data-seed-prebsc-1-s1.binance.org:8545/",
     chainId: 97,
     name: "BSC Testnet",
+    retry: {
+      maxAttempts: 3,
+      delay: 1000,
+      backoff: 1.5
+    }
+  }
+};
+
+// POODL RPC Configuration
+const RPC_POODL_CONFIG = {
+  poodlTestnet: {
+    url: "https://testnet-rpc.poodl.org/",
+    chainId: 15257,
+    name: "POODL Testnet",
     retry: {
       maxAttempts: 3,
       delay: 1000,
@@ -78,6 +93,11 @@ let connectionInProgress = false;
 let connectionPromise: Promise<boolean> | null = null;
 
 export const getReadOnlyContract = () => readOnlyContract;
+
+
+let nftContract: ethers.Contract | null = null;
+const readOnlyNFTContract = new ethers.Contract(GSDT_NFT_ADDRESS, GSDT_NFT_ABI, defaultProvider);
+
 
 // Hardcoded DEFAULT_ADMIN_ROLE value from OpenZeppelin's AccessControl
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000';
@@ -233,6 +253,38 @@ export const getContract = () => {
   } catch (error) {
     console.error('Error in getContract:', error);
     return readOnlyContract;
+  }
+};
+
+export const getNFTContract = () => {
+  try {
+    if (!nftContract) {
+      // Try to initialize if we have a selected address
+      if (window.ethereum && window.ethereum.selectedAddress) {
+        try {
+          // Create provider if it doesn't exist
+          if (!provider) {
+            provider = new ethers.providers.Web3Provider(window.ethereum, {
+              name: RPC_CONFIG.bscTestnet.name,
+              chainId: RPC_CONFIG.bscTestnet.chainId
+            });
+          }
+          
+          // Initialize signer and nftContract
+          signer = provider.getSigner();                  
+          nftContract = new ethers.Contract(GSDT_NFT_ADDRESS, GSDT_NFT_ABI, signer);
+        } catch (error) {
+          console.error('Error initializing nftContract:', error);
+          return readOnlyNFTContract;
+        }
+      } else {
+        return readOnlyNFTContract;
+      }
+    }
+    return nftContract;
+  } catch (error) {
+    console.error('Error in getContract:', error);
+    return readOnlyNFTContract;
   }
 };
 

@@ -1,5 +1,13 @@
-import axios from 'axios';
+import { supabase } from '../lib/supabase';
 import useSWR from 'swr';
+
+export interface ExchangeRate {
+  id: string;
+  currency_from: string;
+  currency_to: string;
+  rate: number;
+  last_updated: string;
+}
 
 // BRICS currencies and their weights in the basket
 export const BRICS_CURRENCIES = {
@@ -11,37 +19,26 @@ export const BRICS_CURRENCIES = {
   IDR: 0.05  // Indonesian Rupiah (5%)
 };
 
-export interface ExchangeRates {
-  base: string;
-  rates: Record<string, number>;
-  timestamp: number;
-}
+// Fetch exchange rates from the database
+const fetchExchangeRates = async (): Promise<ExchangeRate[]> => {
+  const { data, error } = await supabase
+    .from('exchange_rates')
+    .select('*')
+    .order('last_updated', { ascending: false });
 
-// Fetch exchange rates from the API
-const fetchExchangeRates = async (): Promise<ExchangeRates> => {
-  try {
-    const response = await axios.get('https://api.exchangerate-api.com/v4/latest/USD');
-    return {
-      base: 'USDC',
-      rates: response.data.rates,
-      timestamp: Date.now() / 1000
-    };
-  } catch (error) {
-    console.error('Error fetching exchange rates:', error);
-    throw error;
-  }
+  if (error) throw error;
+  return data || [];
 };
 
 // Calculate GSDT price in USDC based on BRICS currency basket
-export const calculateGSDTPrice = (rates: ExchangeRates): number => {
+export const calculateGSDTPrice = (rates: ExchangeRate[]): number => {
   let gsdtPrice = 0;
 
   // Calculate weighted average of BRICS currencies against USDC
   Object.entries(BRICS_CURRENCIES).forEach(([currency, weight]) => {
-    if (rates.rates[currency]) {
-      // Convert each currency to USDC and apply weight
-      const rateToUSDC = 1 / rates.rates[currency];
-      gsdtPrice += rateToUSDC * weight;
+    const rate = rates.find(r => r.currency_from === currency && r.currency_to === 'USDC');
+    if (rate) {
+      gsdtPrice += rate.rate * weight;
     }
   });
 
@@ -51,7 +48,7 @@ export const calculateGSDTPrice = (rates: ExchangeRates): number => {
 
 // Custom hook to fetch and calculate GSDT price
 export const useGSDTPrice = () => {
-  const { data, error, isLoading } = useSWR<ExchangeRates>(
+  const { data, error, isLoading } = useSWR<ExchangeRate[]>(
     'exchange-rates',
     fetchExchangeRates,
     {
@@ -62,22 +59,94 @@ export const useGSDTPrice = () => {
 
   return {
     price: data ? calculateGSDTPrice(data) : null,
-    rates: data?.rates,
+    rates: data,
     isLoading,
     isError: error,
-    timestamp: data?.timestamp
+    timestamp: data?.[0]?.last_updated
   };
 };
 
-// Get individual currency rates against USDC
-export const getCurrencyRates = (rates: Record<string, number> | undefined) => {
-  if (!rates) return null;
+export const getExchangeRates = async (): Promise<ExchangeRate[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('exchange_rates')
+      .select('*')
+      .order('last_updated', { ascending: false });
 
-  return Object.entries(BRICS_CURRENCIES).reduce((acc, [currency, weight]) => {
-    acc[currency] = {
-      rate: rates[currency] ? 1 / rates[currency] : 0,
-      weight: weight * 100
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching exchange rates:', error);
+    throw error;
+  }
+};
+
+export const getCurrencyRates = (rates: ExchangeRate[]) => {
+  if (!rates || rates.length === 0) return null;
+
+  return rates.reduce((acc, rate) => {
+    acc[rate.currency_from] = {
+      rate: rate.rate,
+      lastUpdated: rate.last_updated
     };
     return acc;
-  }, {} as Record<string, { rate: number; weight: number }>);
+  }, {} as Record<string, { rate: number; lastUpdated: string }>);
+};
+
+export const createExchangeRate = async (
+  currencyFrom: string,
+  currencyTo: string,
+  rate: number
+): Promise<ExchangeRate> => {
+  try {
+    const { data, error } = await supabase
+      .from('exchange_rates')
+      .insert([{
+        currency_from: currencyFrom,
+        currency_to: currencyTo,
+        rate
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating exchange rate:', error);
+    throw error;
+  }
+};
+
+export const updateExchangeRate = async (
+  id: string,
+  rate: number
+): Promise<ExchangeRate> => {
+  try {
+    const { data, error } = await supabase
+      .from('exchange_rates')
+      .update({ rate })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error updating exchange rate:', error);
+    throw error;
+  }
+};
+
+export const deleteExchangeRate = async (id: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('exchange_rates')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting exchange rate:', error);
+    throw error;
+  }
 };

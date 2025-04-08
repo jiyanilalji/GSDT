@@ -1,13 +1,12 @@
 import { ReactNode, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useWallet } from '../../../hooks/useWallet';
 import { useAdmin } from '../../../hooks/useAdmin';
 import { AdminRole } from '../../../services/admin';
-import { Link } from 'react-router-dom';
 
 interface AdminLayoutProps {
   children: ReactNode;
-  activeTab: 'kyc' | 'contacts' | 'roles' | 'fiat';
+  activeTab: 'kyc' | 'contacts' | 'roles' | 'fiat' | 'reserves' | 'rates';
 }
 
 export default function AdminLayout({ children, activeTab }: AdminLayoutProps) {
@@ -62,7 +61,7 @@ export default function AdminLayout({ children, activeTab }: AdminLayoutProps) {
 
         {/* Admin Navigation */}
         <div className="mb-8 bg-white shadow rounded-lg p-4">
-          <nav className="flex space-x-4">
+          <nav className="flex flex-wrap gap-4">
             <Link 
               to="/admin/kyc-requests"
               className={`px-3 py-2 rounded-md text-sm font-medium ${
@@ -104,6 +103,37 @@ export default function AdminLayout({ children, activeTab }: AdminLayoutProps) {
                   }`}
                 >
                   Fiat Mint Requests
+                </Link>
+                <Link 
+                  to="/admin/reserves"
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${
+                    activeTab === 'reserves' 
+                      ? 'bg-primary-100 text-primary-700' 
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  Proof of Reserves
+                </Link>
+                <Link 
+                  to="/admin/exchange-rates"
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${
+                    activeTab === 'rates' 
+                      ? 'bg-primary-100 text-primary-700' 
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  Exchange Rates
+                </Link>
+
+                <Link
+                  to="/admin/cms"
+                  className={`block px-4 py-2 rounded-md text-sm font-medium ${
+                    activeTab === 'cms'
+                      ? 'bg-primary-100 text-primary-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  CMS Pages
                 </Link>
               </>
             )}

@@ -1,11 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
 import CryptoJS from 'crypto-js';
 import { supabase } from '../lib/supabase';
-import { KYCStatus, submitSumsubKYCRequest, updateKYCWithSumsubData } from './kyc';
+import { KYCStatus, submitKYCRequest, updateKYCWithSumsubData } from './kyc';
+import axios from 'axios';
 
 // SumSub configuration
 const SUMSUB_APP_TOKEN = import.meta.env.VITE_SUMSUB_APP_TOKEN;
 const SUMSUB_SECRET_KEY = import.meta.env.VITE_SUMSUB_SECRET_KEY;
+const SUMSUB_NODE_API_URL = import.meta.env.VITE_SUMSUB_NODE_API_URL;
 
 // Mock data for development/testing
 const MOCK_ACCESS_TOKEN = 'mock-access-token-' + uuidv4();
@@ -29,48 +31,71 @@ export const getSumsubAccessToken = async (userAddress: string, applicantId?: st
       return MOCK_ACCESS_TOKEN;
     }
 
-    // In production, this would call your backend to get a token
-    // For now, return mock token since we can't make direct API calls
-    return MOCK_ACCESS_TOKEN;
+    const response = await fetch(SUMSUB_NODE_API_URL+'/create-access-token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userAddress }),
+    });
+    
+    const data = await response.json();    
+    if(data.status){
+       return data.response.token;
+    } else {
+      return null
+    }
+   
   } catch (error) {
     console.error('Error getting SumSub access token:', error);
-    return MOCK_ACCESS_TOKEN;
+    return null;
   }
 };
 
 // Create a new applicant
 export const createSumsubApplicant = async (userAddress: string): Promise<string | null> => {
   try {
-    // For development/testing
-    if (!SUMSUB_APP_TOKEN || !SUMSUB_SECRET_KEY) {
-      const mockApplicantId = 'mock-applicant-' + uuidv4();
-      
-      // Store mock applicant in Supabase with valid status
-      await supabase.from('sumsub_applicants').insert([{
-        user_address: userAddress.toLowerCase(),
-        applicant_id: mockApplicantId,
-        status: 'init', // Changed from 'created' to match status_check constraint
-        created_at: new Date().toISOString()
-      }]);
-      
-      return mockApplicantId;
+    const response = await fetch(SUMSUB_NODE_API_URL+'/create-applicant', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userAddress }),
+    });
+    
+    const data = await response.json();    
+    if(data.status){
+       return data.applicant_id;
+    } else {
+      return null
     }
-
-    // In production, this would call your backend
-    // For now, create a mock applicant
-    const mockApplicantId = 'mock-applicant-' + uuidv4();
     
-    // Store in Supabase with valid status
-    await supabase.from('sumsub_applicants').insert([{
-      user_address: userAddress.toLowerCase(),
-      applicant_id: mockApplicantId,
-      status: 'init', // Changed from 'created' to match status_check constraint
-      created_at: new Date().toISOString()
-    }]);
-    
-    return mockApplicantId;
   } catch (error) {
     console.error('Error creating SumSub applicant:', error);
+    return null;
+  }
+};
+
+// Get applicant status
+export const getSumsubApplicantStatus = async (userAddress: string, applicantId?: string): Promise<any> => {
+  try {
+    const response = await fetch(SUMSUB_NODE_API_URL+'/get-applicant-status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ applicantId, userAddress }),
+    });
+    
+    const data = await response.json();    
+    if(data.status){
+       return data.response;
+    } else {
+      return null
+    }
+   
+  } catch (error) {
+    console.error('Error getting SumSub applicant status:', error);
     return null;
   }
 };
@@ -100,27 +125,26 @@ export const processSumsubWebhook = async (payload: SumsubWebhookPayload): Promi
     }]);
 
     // Map webhook status to valid status
-    let status = 'pending'; // Default status
+    let status = KYCStatus.PENDING; // Default status
     switch (payload.reviewStatus) {
       case 'completed':
-        status = 'completed';
+        status = payload.reviewResult === 'GREEN' ? KYCStatus.APPROVED : KYCStatus.REJECTED;
         break;
       case 'rejected':
-        status = 'rejected';
-        break;
-      case 'pending':
-        status = 'pending';
+        status = KYCStatus.REJECTED;
         break;
       default:
-        status = 'init';
+        status = KYCStatus.PENDING;
     }
 
-    // Update applicant status
-    await supabase.from('sumsub_applicants').update({
-      status: status,
-      webhook_data: payload,
-      updated_at: new Date().toISOString()
-    }).eq('applicant_id', payload.applicantId);
+    // Update KYC status in database and blockchain
+    await updateKYCWithSumsubData(
+      payload.externalUserId,
+      payload.applicantId,
+      payload,
+      status,
+      payload.moderationComment
+    );
 
     return true;
   } catch (error) {

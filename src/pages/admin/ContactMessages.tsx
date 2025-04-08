@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '../../hooks/useWallet';
 import { useAdmin } from '../../hooks/useAdmin';
-import { getContactSubmissions, ContactSubmission, updateContactStatus, deleteContactSubmission, sendContactReply } from '../../services/contact';
+import { getContactSubmissions, updateContactStatus, deleteContactSubmission, ContactSubmission, sendContactReply } from '../../services/contact';
 import { format } from 'date-fns';
 import { 
   EyeIcon, 
@@ -15,47 +15,46 @@ import {
 import AdminLayout from './layout/AdminLayout';
 
 export default function ContactMessages() {
-  const { address, isConnected } = useWallet();
-  const { isAdmin, adminRole } = useAdmin();
+  const { isConnected } = useWallet();
+  const { isSuperAdmin } = useAdmin();
   const navigate = useNavigate();
   const [contactSubmissions, setContactSubmissions] = useState<ContactSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [messageSuccess, setMessageSuccess] = useState<string | null>(null);
   
   // Contact message view/reply state
   const [selectedMessage, setSelectedMessage] = useState<ContactSubmission | null>(null);
   const [showMessageModal, setShowMessageModal] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
-  const [messageSuccess, setMessageSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadData = async () => {
+    const loadSubmissions = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Load contact submissions
-        try {
-          const contactData = await getContactSubmissions();
-          setContactSubmissions(contactData || []);
-        } catch (err) {
-          console.error('Error loading contact submissions:', err);
-        }
+        const data = await getContactSubmissions();
+        setContactSubmissions(data);
       } catch (err: any) {
-        console.error('Error loading admin data:', err);
-        setError(err.message || 'Error loading admin data');
+        console.error('Error loading contact submissions:', err);
+        setError(err.message || 'Error loading contact submissions');
       } finally {
         setLoading(false);
       }
     };
 
-    loadData();
+    loadSubmissions();
   }, []);
 
-  // Contact message functions
-  const handleContactStatusChange = async (id: string, status: 'new' | 'read' | 'replied' | 'archived') => {
+  const handleStatusChange = async (id: string, status: 'new' | 'read' | 'replied' | 'archived') => {
+    if (!isSuperAdmin) {
+      setError('Only Super Admins can change message status');
+      return;
+    }
+
     try {
       setActionLoading(true);
       const success = await updateContactStatus(id, status);
@@ -77,6 +76,9 @@ export default function ContactMessages() {
             status
           });
         }
+        
+        setMessageSuccess('Status updated successfully');
+        setTimeout(() => setMessageSuccess(null), 3000);
       }
     } catch (err: any) {
       console.error('Error updating status:', err);
@@ -86,7 +88,12 @@ export default function ContactMessages() {
     }
   };
 
-  const handleDeleteMessage = async (id: string) => {
+  const handleDelete = async (id: string) => {
+    if (!isSuperAdmin) {
+      setError('Only Super Admins can delete messages');
+      return;
+    }
+
     try {
       setActionLoading(true);
       const success = await deleteContactSubmission(id);
@@ -103,11 +110,7 @@ export default function ContactMessages() {
         }
         
         setMessageSuccess('Message deleted successfully');
-        
-        // Clear success message after 3 seconds
-        setTimeout(() => {
-          setMessageSuccess(null);
-        }, 3000);
+        setTimeout(() => setMessageSuccess(null), 3000);
       } else {
         setError('Failed to delete message');
       }
@@ -126,7 +129,7 @@ export default function ContactMessages() {
     
     // If message is new, mark it as read
     if (message.status === 'new') {
-      await handleContactStatusChange(message.id, 'read');
+      await handleStatusChange(message.id, 'read');
     }
   };
 
@@ -141,7 +144,7 @@ export default function ContactMessages() {
       
       if (success) {
         // Update status to replied
-        await handleContactStatusChange(selectedMessage.id, 'replied');
+        await handleStatusChange(selectedMessage.id, 'replied');
         
         setMessageSuccess('Reply sent successfully');
         setReplyText('');
@@ -180,7 +183,6 @@ export default function ContactMessages() {
 
   return (
     <AdminLayout activeTab="contacts">
-      {/* Contact Submissions Table */}
       <div className="bg-white shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
           <div className="sm:flex sm:items-center">
@@ -281,34 +283,38 @@ export default function ContactMessages() {
                             <EyeIcon className="h-5 w-5" />
                           </button>
                           
-                          {submission.status === 'archived' ? (
-                            <button
-                              onClick={() => handleContactStatusChange(submission.id, 'read')}
-                              disabled={actionLoading}
-                              className="text-green-600 hover:text-green-900 disabled:opacity-50 flex items-center"
-                              title="Unarchive Message"
-                            >
-                              <ArchiveBoxXMarkIcon className="h-5 w-5" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleContactStatusChange(submission.id, 'archived')}
-                              disabled={actionLoading}
-                              className="text-gray-600 hover:text-gray-900 disabled:opacity-50 flex items-center"
-                              title="Archive Message"
-                            >
-                              <ArchiveBoxIcon className="h-5 w-5" />
-                            </button>
+                          {isSuperAdmin && (
+                            <>
+                              {submission.status === 'archived' ? (
+                                <button
+                                  onClick={() => handleStatusChange(submission.id, 'read')}
+                                  disabled={actionLoading}
+                                  className="text-green-600 hover:text-green-900 disabled:opacity-50 flex items-center"
+                                  title="Unarchive Message"
+                                >
+                                  <ArchiveBoxXMarkIcon className="h-5 w-5" />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleStatusChange(submission.id, 'archived')}
+                                  disabled={actionLoading}
+                                  className="text-gray-600 hover:text-gray-900 disabled:opacity-50 flex items-center"
+                                  title="Archive Message"
+                                >
+                                  <ArchiveBoxIcon className="h-5 w-5" />
+                                </button>
+                              )}
+                              
+                              <button
+                                onClick={() => setShowDeleteConfirm(submission.id)}
+                                disabled={actionLoading}
+                                className="text-red-600 hover:text-red-900 disabled:opacity-50 flex items-center"
+                                title="Delete Message"
+                              >
+                                <TrashIcon className="h-5 w-5" />
+                              </button>
+                            </>
                           )}
-                          
-                          <button
-                            onClick={() => setShowDeleteConfirm(submission.id)}
-                            disabled={actionLoading}
-                            className="text-red-600 hover:text-red-900 disabled:opacity-50 flex items-center"
-                            title="Delete Message"
-                          >
-                            <TrashIcon className="h-5 w-5" />
-                          </button>
                         </div>
                       </td>
                     </motion.tr>
@@ -392,7 +398,7 @@ export default function ContactMessages() {
                     
                     {selectedMessage.status === 'archived' ? (
                       <button
-                        onClick={() => handleContactStatusChange(selectedMessage.id, 'read')}
+                        onClick={() => handleStatusChange(selectedMessage.id, 'read')}
                         disabled={actionLoading}
                         className="inline-flex items-center px-4 py-2 text-sm font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                       >
@@ -401,7 +407,7 @@ export default function ContactMessages() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => handleContactStatusChange(selectedMessage.id, 'archived')}
+                        onClick={() => handleStatusChange(selectedMessage.id, 'archived')}
                         disabled={actionLoading}
                         className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                       >
@@ -475,7 +481,7 @@ export default function ContactMessages() {
                 Cancel
               </button>
               <button
-                onClick={() => showDeleteConfirm && handleDeleteMessage(showDeleteConfirm)}
+                onClick={() => showDeleteConfirm && handleDelete(showDeleteConfirm)}
                 disabled={actionLoading}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 flex items-center"
               >

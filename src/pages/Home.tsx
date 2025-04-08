@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { ArrowPathIcon, CloudArrowUpIcon, LockClosedIcon, ChartBarIcon, CurrencyDollarIcon, ShieldCheckIcon, GlobeAltIcon, BanknotesIcon } from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom';
+import ExchangeRatesList from '../components/ExchangeRatesList';
 
 const features = [
   {
@@ -103,59 +104,13 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Currency Rates Table */}
+            {/* Exchange Rates Table */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
-              className="bg-white/10 backdrop-blur-lg rounded-xl p-6 shadow-xl"
             >
-              <h3 className="text-xl font-semibold mb-4">Live Exchange Rates</h3>
-              <div className="overflow-hidden rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200/20">
-                  <thead>
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Currency</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Rate</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">24h Change</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200/20">
-                    {[
-                      { code: 'CNH', name: 'Chinese Yuan', rate: '7.2934', change: '+0.45%', positive: true },
-                      { code: 'RUB', name: 'Russian Ruble', rate: '98.7623', change: '-0.32%', positive: false },
-                      { code: 'INR', name: 'Indian Rupee', rate: '83.2741', change: '+0.21%', positive: true },
-                      { code: 'BRL', name: 'Brazilian Real', rate: '5.0432', change: '+0.67%', positive: true },
-                      { code: 'ZAR', name: 'South African Rand', rate: '19.2845', change: '-0.15%', positive: false },
-                      { code: 'IDR', name: 'Indonesian Rupiah', rate: '15683.45', change: '+0.33%', positive: true }
-                    ].map((currency) => (
-                      <motion.tr
-                        key={currency.code}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.3 }}
-                        className="hover:bg-white/5"
-                      >
-                        <td className="px-4 py-3 text-sm">
-                          <div>
-                            <div className="font-medium text-white">{currency.code}</div>
-                            <div className="text-gray-400 text-xs">{currency.name}</div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-white">${currency.rate}</td>
-                        <td className={`px-4 py-3 text-sm ${currency.positive ? 'text-green-400' : 'text-red-400'}`}>
-                          {currency.change}
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="p-4 border-t border-gray-200/20">
-                  <p className="text-xs text-gray-400">
-                    Last updated: {new Date().toLocaleString()}
-                  </p>
-                </div>
-              </div>
+              <ExchangeRatesList refreshInterval={30000} />
             </motion.div>
           </div>
         </motion.div>
@@ -244,6 +199,7 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-2xl lg:max-w-none">
             <div className="text-center">
+              
               <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
                 Trusted by users worldwide
               </h2>

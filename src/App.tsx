@@ -11,9 +11,12 @@ import KYCRequests from './pages/admin/KYCRequests';
 import ContactMessages from './pages/admin/ContactMessages';
 import RoleManagement from './pages/admin/RoleManagement';
 import FiatMintRequests from './pages/admin/FiatMintRequests';
+import ProofOfReserves from './pages/admin/ProofOfReserves';
+import ExchangeRates from './pages/admin/ExchangeRates';
 import TransactionList from './pages/TransactionList';
-import TokenMinting from './pages/TokenMinting';
 import ProtectedRoute from './components/ProtectedRoute';
+import TokenMinting from './pages/TokenMinting';
+import CMSPages from './pages/admin/CMSPages';
 
 export default function App() {
   return (
@@ -30,6 +33,8 @@ export default function App() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/admin/cms" element={<CMSPages />} />
+
             <Route 
               path="/admin/dashboard" 
               element={
@@ -67,6 +72,22 @@ export default function App() {
               element={
                 <ProtectedRoute requireAdmin={true}>
                   <FiatMintRequests />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/reserves" 
+              element={
+                <ProtectedRoute requireAdmin={true}>
+                  <ProofOfReserves />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/exchange-rates" 
+              element={
+                <ProtectedRoute requireAdmin={true}>
+                  <ExchangeRates />
                 </ProtectedRoute>
               } 
             />
